@@ -3,6 +3,7 @@
 #include "BitStream.h"
 
 #include <iostream>
+#include <sstream>
 #include <thread>
 #include <chrono>
 #include <map>
@@ -41,7 +42,7 @@ enum EPlayerClass
 {
 	Mage = 0,
 	Rogue,
-	Cleric,
+	Fighter,
 };
 
 struct SPlayer
