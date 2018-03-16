@@ -21,6 +21,7 @@ enum NetworkState
 	NS_Started,
 	NS_Lobby,
 	NS_Pending,
+	NS_InactiveTurn,
 	NS_ActiveTurn,
 	NS_Dead,
 };
@@ -39,8 +40,7 @@ enum {
 	ID_THEGAME_LOBBY_READY = ID_USER_PACKET_ENUM,
 	ID_PLAYER_READY,
 	ID_THEGAME_START,
-	ID_ACTION_ATTACK,
-	ID_ACTION_HEAL,
+	ID_ACTION,
 	ID_SERVERNOTIFICATION,
 };
 
@@ -71,6 +71,18 @@ struct SPlayer
 		writeBs.Write((RakNet::MessageID)ID_PLAYER_READY);
 		RakNet::RakString name(m_name.c_str());
 		writeBs.Write(name);
+
+		//returns 0 when something is wrong
+		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, isBroadcast));
+	}
+
+	void Notify(RakNet::SystemAddress systemAddress, bool isBroadcast, EServerNotices notice, const char* msg = "")
+	{
+		RakNet::BitStream writeBs;
+		writeBs.Write((RakNet::MessageID)ID_SERVERNOTIFICATION);
+		writeBs.Write(notice);
+		RakNet::RakString message(msg);
+		writeBs.Write(message);
 
 		//returns 0 when something is wrong
 		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, isBroadcast));
@@ -130,6 +142,25 @@ void DisplayPlayerReady(RakNet::Packet* packet)
 	std::cout << userName.C_String() << " has joined" << std::endl;
 }
 
+std::string GetPlayerName(unsigned int guid)
+{
+	return m_players.at(guid).m_name;
+}
+
+unsigned int NextActivePlayerGUID()
+{
+	// find the player and move the iterator by one
+	std::map<unsigned long, SPlayer>::iterator it = m_players.find(activePlayer)++; 
+
+	// point to the first player if the iterator moved past the end
+	if (it == m_players.end())
+	{
+		it = m_players.begin();
+	}
+
+	return it->first;
+}
+
 void OnLobbyReady(RakNet::Packet* packet)
 {
 	// Make a bitstream out of the packet we got
@@ -166,7 +197,7 @@ void OnLobbyReady(RakNet::Packet* packet)
 
 	// Get guid from this packet
 	unsigned long guid = RakNet::RakNetGUID::ToUint32(packet->guid);
-	activePlayer = activePlayer == -1 ? guid : activePlayer;
+	activePlayer = activePlayer == -1 ? guid : activePlayer; // set the active player on the server
 	SPlayer& player = GetPlayer(packet->guid); // somehow get a reference to the player who sent the message based on the guid
 	player.m_name = userName; // Set this players username to the one the user sent in the packet
 	player.m_class = classSelection;
@@ -203,21 +234,42 @@ void OnLobbyReady(RakNet::Packet* packet)
 }
 
 /// This will take care of attacks sent to server by players
-void HandleAttack(RakNet::Packet *packet)
+void HandleAction(RakNet::Packet *packet)
 {
-	// Will do something with the packet in here
-}
 
-/// This will take care of heal actions sent to server by players
-void HandleHeal(RakNet::Packet *packet)
-{
-	// Will do something with the packet in here
 }
 
 /// This takes messages from the server and does things with them
 void HandleServerNotification(RakNet::Packet *packet)
 {
-	// Gonna put something in here too
+	// Make a bitstream out of the packet we got
+	RakNet::BitStream bs(packet->data, packet->length, false);
+	// Read stuff out of the packet in the same order it was written in
+	RakNet::MessageID messageId;
+	bs.Read(messageId);
+	
+	EServerNotices notice;
+	bs.Read(notice);
+	
+	char* msg;
+	bs.Read(msg);
+
+	switch (notice)
+	{
+	case Message:
+		std::cout << msg << std::endl;
+		break;
+	case Death:
+		g_networkState = NS_Dead;
+		break;
+	case Activation:
+		std::cout << msg << std::endl;
+		g_networkState = NS_ActiveTurn;
+		break;
+	default:
+		break;
+	}
+
 }
 
 unsigned char GetPacketIdentifier(RakNet::Packet *packet)
@@ -265,6 +317,14 @@ void InputHandler()
 			//quitting is not acceptable in our game, create a crash to teach lesson
 			assert(strcmp(userInput, "quit"));
 
+			std::cout << "Choose your class:\n1) Mage\n2) Rogue\n3) Fighter\n>> ";
+			int idx;
+			if (!(std::cin >> idx))
+			{
+				idx = 1;
+				std::cin.clear();
+			}
+
 			// Make a bitstream
 			RakNet::BitStream bs;
 			// Write a RakNet message to the bitstream about an enum value from RakNet somewhere
@@ -273,14 +333,6 @@ void InputHandler()
 			RakNet::RakString name(userInput);
 			// Also write our users name to the bitstream
 			bs.Write(name);
-
-			std::cout << "Choose your class:\n1) Mage\n2) Rogue\n3) Fighter\n>> ";
-			int idx;
-			if (!(std::cin >> idx))
-			{
-				idx = 1;
-			}
-
 			bs.Write(idx);
 
 			//returns 0 when something is wrong
@@ -297,7 +349,7 @@ void InputHandler()
 			// Tell the user we're pending, but only once.
 			static bool doOnce = false;
 			if (!doOnce)
-				std::cout << "Wait for your turn..." << std::endl;
+				std::cout << "Wait for your turn.\nEnter ? any time to get stats.\n>> ";
 
 			doOnce = true;
 		}
@@ -412,10 +464,8 @@ void PacketHandler()
 				case ID_PLAYER_READY:
 					DisplayPlayerReady(packet);
 					break;
-				case ID_ACTION_ATTACK:
-					HandleAttack(packet);
-				case ID_ACTION_HEAL:
-					HandleHeal(packet);
+				case ID_ACTION:
+					HandleAction(packet);
 					break;
 				case ID_SERVERNOTIFICATION:
 					HandleServerNotification(packet);
