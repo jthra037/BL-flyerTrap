@@ -21,6 +21,8 @@ enum NetworkState
 	NS_Started,
 	NS_Lobby,
 	NS_Pending,
+	NS_ActiveTurn,
+	NS_Dead,
 };
 
 bool isServer = false;
@@ -37,6 +39,16 @@ enum {
 	ID_THEGAME_LOBBY_READY = ID_USER_PACKET_ENUM,
 	ID_PLAYER_READY,
 	ID_THEGAME_START,
+	ID_ACTION_ATTACK,
+	ID_ACTION_HEAL,
+	ID_SERVERNOTIFICATION,
+};
+
+enum EServerNotices
+{
+	Message = 0,
+	Death,
+	Activation,
 };
 
 enum EPlayerClass
@@ -190,6 +202,24 @@ void OnLobbyReady(RakNet::Packet* packet)
 
 }
 
+/// This will take care of attacks sent to server by players
+void HandleAttack(RakNet::Packet *packet)
+{
+	// Will do something with the packet in here
+}
+
+/// This will take care of heal actions sent to server by players
+void HandleHeal(RakNet::Packet *packet)
+{
+	// Will do something with the packet in here
+}
+
+/// This takes messages from the server and does things with them
+void HandleServerNotification(RakNet::Packet *packet)
+{
+	// Gonna put something in here too
+}
+
 unsigned char GetPacketIdentifier(RakNet::Packet *packet)
 {
 	if (packet == nullptr)
@@ -267,9 +297,17 @@ void InputHandler()
 			// Tell the user we're pending, but only once.
 			static bool doOnce = false;
 			if (!doOnce)
-				std::cout << "pending..." << std::endl;
+				std::cout << "Wait for your turn..." << std::endl;
 
 			doOnce = true;
+		}
+		else if (g_networkState == NS_ActiveTurn)
+		{
+			// We gonna do something in here
+		}
+		else if (g_networkState == NS_Dead)
+		{
+			// We gonna figure out if the player is dead
 		}
 		// Sleep this thread to keep everything responsive
 		std::this_thread::sleep_for(std::chrono::microseconds(1));
@@ -373,6 +411,14 @@ void PacketHandler()
 					break;
 				case ID_PLAYER_READY:
 					DisplayPlayerReady(packet);
+					break;
+				case ID_ACTION_ATTACK:
+					HandleAttack(packet);
+				case ID_ACTION_HEAL:
+					HandleHeal(packet);
+					break;
+				case ID_SERVERNOTIFICATION:
+					HandleServerNotification(packet);
 					break;
 				default:
 					break;
