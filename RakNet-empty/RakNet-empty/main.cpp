@@ -9,6 +9,7 @@
 #include <map>
 #include <mutex>
 
+const char* CONNECTION_IP = "192.168.0.105";
 static unsigned int SERVER_PORT = 65000;
 static unsigned int CLIENT_PORT = 65001;
 static unsigned int MAX_CONNECTIONS = 4;
@@ -64,6 +65,7 @@ struct SPlayer
 	}
 };
 
+unsigned long activePlayer = -1;
 std::map<unsigned long, SPlayer> m_players;
 
 // Do something with the guid of the packet and a map??
@@ -125,12 +127,39 @@ void OnLobbyReady(RakNet::Packet* packet)
 	bs.Read(messageId);
 	RakNet::RakString userName;
 	bs.Read(userName);
+	int idx;
+	bs.Read(idx);
+
+	EPlayerClass classSelection;
+	std::string classToPrint;
+	switch (idx)
+	{
+	case 1:
+		classSelection = Mage;
+		classToPrint = "Mage";
+		break;
+	case 2:
+		classSelection = Rogue;
+		classToPrint = "Rogue";
+		break;
+	case 3:
+		classSelection = Fighter;
+		classToPrint = "Fighter";
+		break;
+	default:
+		classSelection = Mage;
+		classToPrint = "Mage";
+		break;
+	}
 
 	// Get guid from this packet
 	unsigned long guid = RakNet::RakNetGUID::ToUint32(packet->guid);
+	activePlayer = activePlayer == -1 ? guid : activePlayer;
 	SPlayer& player = GetPlayer(packet->guid); // somehow get a reference to the player who sent the message based on the guid
 	player.m_name = userName; // Set this players username to the one the user sent in the packet
-	std::cout << userName.C_String() << " aka " << player.m_name.c_str() << " IS READY!!!!!" << std::endl; // Let the user running the server know that this new player is ready
+	player.m_class = classSelection;
+	player.m_health = 20;
+	std::cout << player.m_name << " the " << classToPrint << " IS READY!!!!!" << std::endl; // Let the user running the server know that this new player is ready
 
 	//notify all other connected players that this plyer has joined the game
 	for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
@@ -214,6 +243,15 @@ void InputHandler()
 			RakNet::RakString name(userInput);
 			// Also write our users name to the bitstream
 			bs.Write(name);
+
+			std::cout << "Choose your class:\n1) Mage\n2) Rogue\n3) Fighter\n>> ";
+			int idx;
+			if (!(std::cin >> idx))
+			{
+				idx = 1;
+			}
+
+			bs.Write(idx);
 
 			//returns 0 when something is wrong
 			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false)); // Send our bitstream to the server, crash if it doesn't work
@@ -406,7 +444,7 @@ int main()
 				g_rakPeerInterface->SetOccasionalPing(true);
 				//"127.0.0.1" = local host = your machines address
 				// Try to connect to server (using home local IP or generic IP, whichever seems to work)
-				RakNet::ConnectionAttemptResult car = g_rakPeerInterface->Connect("192.168.0.102", SERVER_PORT, nullptr, 0);
+				RakNet::ConnectionAttemptResult car = g_rakPeerInterface->Connect(CONNECTION_IP, SERVER_PORT, nullptr, 0);
 				RakAssert(car == RakNet::CONNECTION_ATTEMPT_STARTED); // hopefully this works
 				std::cout << "client attempted connection..." << std::endl; // Let the user know what is happening
 
