@@ -64,9 +64,13 @@ struct SPlayer
 	unsigned int m_health;
 	EPlayerClass m_class;
 
+	RakNet::SystemAddress m_systemAddress;
+
 	//function to send a packet with name/health/class etc
 	void SendName(RakNet::SystemAddress systemAddress, bool isBroadcast)
 	{
+		m_systemAddress = systemAddress;
+
 		RakNet::BitStream writeBs;
 		writeBs.Write((RakNet::MessageID)ID_PLAYER_READY);
 		RakNet::RakString name(m_name.c_str());
@@ -86,6 +90,30 @@ struct SPlayer
 
 		//returns 0 when something is wrong
 		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, isBroadcast));
+	}
+
+	void Notify(RakNet::SystemAddress systemAddress, bool isBroadcast, EServerNotices notice, std::string msg = "")
+	{
+		RakNet::BitStream writeBs;
+		writeBs.Write((RakNet::MessageID)ID_SERVERNOTIFICATION);
+		writeBs.Write(notice);
+		RakNet::RakString message(msg.c_str());
+		writeBs.Write(message);
+
+		//returns 0 when something is wrong
+		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, isBroadcast));
+	}
+
+	void Notify(bool isBroadcast, EServerNotices notice, std::string msg = "")
+	{
+		RakNet::BitStream writeBs;
+		writeBs.Write((RakNet::MessageID)ID_SERVERNOTIFICATION);
+		writeBs.Write(notice);
+		RakNet::RakString message(msg.c_str());
+		writeBs.Write(message);
+
+		//returns 0 when something is wrong
+		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, m_systemAddress, isBroadcast));
 	}
 };
 
@@ -147,6 +175,22 @@ std::string GetPlayerName(unsigned int guid)
 	return m_players.at(guid).m_name;
 }
 
+std::string GetTargetList()
+{
+	std::string response;
+	int i = 1;
+	for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
+	{
+		std::string index = std::to_string(i);
+		std::string name = it->second.m_name;
+		response.append(index).append(") ").append(name).append("\n");
+		i++;
+	}
+	response.append(">> ");
+	
+	return response;
+}
+
 unsigned int NextActivePlayerGUID()
 {
 	// find the player and move the iterator by one
@@ -159,6 +203,23 @@ unsigned int NextActivePlayerGUID()
 	}
 
 	return it->first;
+}
+
+unsigned long PlayerByIndex(int idx)
+{
+	unsigned int found = -1;
+	int i = 1;
+	for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
+	{
+		if (i == idx)
+		{
+			return it->first;
+		}
+
+		i++;
+	}
+
+	return found;
 }
 
 void OnLobbyReady(RakNet::Packet* packet)
@@ -197,7 +258,6 @@ void OnLobbyReady(RakNet::Packet* packet)
 
 	// Get guid from this packet
 	unsigned long guid = RakNet::RakNetGUID::ToUint32(packet->guid);
-	activePlayer = activePlayer == -1 ? guid : activePlayer; // set the active player on the server
 	SPlayer& player = GetPlayer(packet->guid); // somehow get a reference to the player who sent the message based on the guid
 	player.m_name = userName; // Set this players username to the one the user sent in the packet
 	player.m_class = classSelection;
@@ -215,28 +275,75 @@ void OnLobbyReady(RakNet::Packet* packet)
 
 		SPlayer& player = it->second;
 		player.SendName(packet->systemAddress, false);
-		/*RakNet::BitStream writeBs;
-		writeBs.Write((RakNet::MessageID)ID_PLAYER_READY);
-		RakNet::RakString name(player.m_name.c_str());
-		writeBs.Write(name);
-
-		//returns 0 when something is wrong
-		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));*/
 	}
 
 	player.SendName(packet->systemAddress, true);
-	/*RakNet::BitStream writeBs;
-	writeBs.Write((RakNet::MessageID)ID_PLAYER_READY);
-	RakNet::RakString name(player.m_name.c_str());
-	writeBs.Write(name);
-	assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, true));*/
 
+	if (activePlayer == -1 && m_players.size() > 1)
+	{
+		activePlayer = m_players.begin()->first;
+		for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
+		{
+			SPlayer& player = it->second;
+			player.Notify(packet->systemAddress, true, Message, "Game is on!");
+
+			//skip over the player who just joined
+			if (activePlayer == it->first)
+			{
+				std::string msg = "You are the active player.\n";
+				msg.append("Please select a target (if you select yourself you heal)\n");
+				msg.append(GetTargetList());
+				player.Notify(packet->systemAddress, false, Activation, msg);
+			}
+			else
+			{
+				std::string msg = m_players.at(activePlayer).m_name.append(" is the active player.");
+				player.Notify(packet->systemAddress, false, Message, msg);
+			}
+		}
+	}
+	else if (activePlayer != -1)
+	{
+		std::string msg = m_players.at(activePlayer).m_name.append(" is the active player.");
+		player.Notify(packet->systemAddress, false, Message, msg);
+	}
+	
+	player.SendName(packet->systemAddress, false);
 }
 
 /// This will take care of attacks sent to server by players
 void HandleAction(RakNet::Packet *packet)
 {
+	// Make a bitstream out of the packet we got
+	RakNet::BitStream bs(packet->data, packet->length, false);
+	// Read stuff out of the packet in the same order it was written in
+	RakNet::MessageID messageId;
+	bs.Read(messageId);
 
+	int selection;
+	bs.Read(selection);
+
+	unsigned long guid = RakNet::RakNetGUID::ToUint32(packet->guid);
+	unsigned long selectedGUID = PlayerByIndex(selection);
+
+	if (selectedGUID == -1)
+	{
+		std::cout << "Selection was invalid." << std::endl;
+	}
+	else if (selectedGUID == guid)
+	{
+		std::cout << guid << " should heal" << std::endl;
+	}
+	else
+	{
+		std::cout << selectedGUID << " is being attacked by " << guid << std::endl;
+	}
+
+	activePlayer = NextActivePlayerGUID();
+	std::string msg = "You are the active player.\n";
+	msg.append("Please select a target (if you select yourself you heal)\n");
+	msg.append(GetTargetList());
+	m_players.at(activePlayer).Notify(false, Activation, msg);
 }
 
 /// This takes messages from the server and does things with them
@@ -251,7 +358,7 @@ void HandleServerNotification(RakNet::Packet *packet)
 	EServerNotices notice;
 	bs.Read(notice);
 	
-	char* msg;
+	char msg [256];
 	bs.Read(msg);
 
 	switch (notice)
@@ -355,7 +462,27 @@ void InputHandler()
 		}
 		else if (g_networkState == NS_ActiveTurn)
 		{
-			// We gonna do something in here
+			int idx;
+			if (!(std::cin >> idx))
+			{
+				idx = 1;
+				std::cin.clear();
+			}
+
+			// Make a bitstream
+			RakNet::BitStream bs;
+			// Write a RakNet message to the bitstream about an enum value from RakNet somewhere
+			bs.Write((RakNet::MessageID)ID_ACTION);
+			// Convert character buffer to RakString?
+			bs.Write(idx);
+
+			//returns 0 when something is wrong
+			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false)); // Send our bitstream to the server, crash if it doesn't work
+
+			// Change states safely
+			g_networkState_mutex.lock();
+			g_networkState = NS_Pending;
+			g_networkState_mutex.unlock();
 		}
 		else if (g_networkState == NS_Dead)
 		{
