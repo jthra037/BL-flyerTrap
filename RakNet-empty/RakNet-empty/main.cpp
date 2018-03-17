@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include <time.h>
 #include <chrono>
 #include <map>
 #include <mutex>
@@ -41,6 +42,7 @@ enum {
 	ID_PLAYER_READY,
 	ID_THEGAME_START,
 	ID_ACTION,
+	ID_STAT,
 	ID_SERVERNOTIFICATION,
 };
 
@@ -69,8 +71,6 @@ struct SPlayer
 	//function to send a packet with name/health/class etc
 	void SendName(RakNet::SystemAddress systemAddress, bool isBroadcast)
 	{
-		m_systemAddress = systemAddress;
-
 		RakNet::BitStream writeBs;
 		writeBs.Write((RakNet::MessageID)ID_PLAYER_READY);
 		RakNet::RakString name(m_name.c_str());
@@ -191,18 +191,18 @@ std::string GetTargetList()
 	return response;
 }
 
-unsigned int NextActivePlayerGUID()
+void NextActivePlayerGUID()
 {
 	// find the player and move the iterator by one
-	std::map<unsigned long, SPlayer>::iterator it = m_players.find(activePlayer)++; 
+	std::map<unsigned long, SPlayer>::iterator it = m_players.find(activePlayer); 
 
-	// point to the first player if the iterator moved past the end
-	if (it == m_players.end())
+	if (++it == m_players.end())
 	{
 		it = m_players.begin();
+		std::cout << "Iterator wrapping back to start for next player!" << std::endl;
 	}
 
-	return it->first;
+	activePlayer = it->first;
 }
 
 unsigned long PlayerByIndex(int idx)
@@ -262,6 +262,7 @@ void OnLobbyReady(RakNet::Packet* packet)
 	player.m_name = userName; // Set this players username to the one the user sent in the packet
 	player.m_class = classSelection;
 	player.m_health = 20;
+	player.m_systemAddress = packet->systemAddress;
 	std::cout << player.m_name << " the " << classToPrint << " IS READY!!!!!" << std::endl; // Let the user running the server know that this new player is ready
 
 	//notify all other connected players that this plyer has joined the game
@@ -282,10 +283,11 @@ void OnLobbyReady(RakNet::Packet* packet)
 	if (activePlayer == -1 && m_players.size() > 1)
 	{
 		activePlayer = m_players.begin()->first;
+		player.Notify(packet->systemAddress, true, Message, "Game is on!");
+		
 		for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
 		{
 			SPlayer& player = it->second;
-			player.Notify(packet->systemAddress, true, Message, "Game is on!");
 
 			//skip over the player who just joined
 			if (activePlayer == it->first)
@@ -297,18 +299,57 @@ void OnLobbyReady(RakNet::Packet* packet)
 			}
 			else
 			{
-				std::string msg = m_players.at(activePlayer).m_name.append(" is the active player.");
+				std::string msg = m_players.at(activePlayer).m_name;
+				msg.append(" is the active player.");
 				player.Notify(packet->systemAddress, false, Message, msg);
 			}
 		}
 	}
 	else if (activePlayer != -1)
 	{
-		std::string msg = m_players.at(activePlayer).m_name.append(" is the active player.");
+		std::string msg = m_players.at(activePlayer).m_name;
+		msg.append(" is the active player.");
 		player.Notify(packet->systemAddress, false, Message, msg);
+		m_players.at(activePlayer).Notify(false, Message, GetTargetList());
 	}
 	
-	player.SendName(packet->systemAddress, false);
+}
+
+std::string ConstructStats()
+{
+	std::string response = "It's ";
+	response.append(m_players.at(activePlayer).m_name);
+	response.append("'s turn.\n");
+	for (const auto& itPair : m_players)
+	{
+		response.append(itPair.second.m_name);
+		response.append(" has ");
+		response.append(std::to_string(itPair.second.m_health));
+		response.append(" hp.\n");
+	}
+
+	return response;
+}
+
+void ReturnStats(RakNet::Packet* packet)
+{
+	// Make a bitstream out of the packet we got
+	RakNet::BitStream bs(packet->data, packet->length, false);
+	// Read stuff out of the packet in the same order it was written in
+	RakNet::MessageID messageId;
+	bs.Read(messageId);
+
+	RakNet::RakString query;
+	bs.Read(query);
+
+	if (query.C_String()[0] == '?')
+	{
+		GetPlayer(packet->guid).Notify(false, Message, ConstructStats());
+	}
+	else
+	{
+		GetPlayer(packet->guid).Notify(false, Message, "Invalid server command.");
+	}
 }
 
 /// This will take care of attacks sent to server by players
@@ -328,18 +369,46 @@ void HandleAction(RakNet::Packet *packet)
 
 	if (selectedGUID == -1)
 	{
-		std::cout << "Selection was invalid." << std::endl;
+		m_players.at(guid).Notify(false, Message, "Invalid target!");
 	}
 	else if (selectedGUID == guid)
 	{
-		std::cout << guid << " should heal" << std::endl;
+		int hp = rand() % 5 + 1;
+		m_players.at(selectedGUID).m_health += hp;
+
+		std::string msg = m_players.at(guid).m_name;
+		msg.append(" healed by  ");
+		msg.append(std::to_string(hp));
+		msg.append(" and now has: ");
+		msg.append(std::to_string(m_players.at(guid).m_health));
+		m_players.at(guid).Notify(true, Message, msg);
+		m_players.at(guid).Notify(false, Message, msg);
 	}
 	else
 	{
-		std::cout << selectedGUID << " is being attacked by " << guid << std::endl;
+		int dmg = rand() % 5 + 1;
+		m_players.at(selectedGUID).m_health -= dmg;
+
+		std::string msg = m_players.at(selectedGUID).m_name;
+		msg.append(" took ");
+		msg.append(std::to_string(dmg));
+		msg.append(" and now has: ");
+		msg.append(std::to_string(m_players.at(selectedGUID).m_health));
+		m_players.at(guid).Notify(true, Message, msg);
+		m_players.at(guid).Notify(false, Message, msg);
+
+		if (m_players.at(selectedGUID).m_health <= 0 || m_players.at(selectedGUID).m_health > 1000)
+		{
+			std::string msg = m_players.at(selectedGUID).m_name;
+			msg.append(" has died!");
+			std::cout << msg << std::endl;
+			m_players.at(selectedGUID).Notify(false, Death, "You dead!");
+			m_players.at(selectedGUID).Notify(true, Message, msg);
+			m_players.erase(selectedGUID);
+		}
 	}
 
-	activePlayer = NextActivePlayerGUID();
+	NextActivePlayerGUID();
 	std::string msg = "You are the active player.\n";
 	msg.append("Please select a target (if you select yourself you heal)\n");
 	msg.append(GetTargetList());
@@ -367,6 +436,7 @@ void HandleServerNotification(RakNet::Packet *packet)
 		std::cout << msg << std::endl;
 		break;
 	case Death:
+		std::cout << msg << std::endl;
 		g_networkState = NS_Dead;
 		break;
 	case Activation:
@@ -454,11 +524,24 @@ void InputHandler()
 		else if (g_networkState == NS_Pending)
 		{
 			// Tell the user we're pending, but only once.
-			static bool doOnce = false;
-			if (!doOnce)
-				std::cout << "Wait for your turn.\nEnter ? any time to get stats.\n>> ";
+			std::cout << ">> ";
+			char input[256];
+			if (!(std::cin >> input))
+			{
+				std::cin.clear();
+			}
 
-			doOnce = true;
+			// Make a bitstream
+			RakNet::BitStream bs;
+			// Write a RakNet message to the bitstream about an enum value from RakNet somewhere
+			bs.Write((RakNet::MessageID)ID_STAT);
+			// Convert character buffer to RakString?
+			RakNet::RakString name(input);
+			// Also write our users name to the bitstream
+			bs.Write(input);
+
+			//returns 0 when something is wrong
+			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false)); // Send our bitstream to the server, crash if it doesn't work
 		}
 		else if (g_networkState == NS_ActiveTurn)
 		{
@@ -487,6 +570,25 @@ void InputHandler()
 		else if (g_networkState == NS_Dead)
 		{
 			// We gonna figure out if the player is dead
+			// Tell the user we're pending, but only once.
+			std::cout << "You're dead, but you can still ask for stats\n>> ";
+			char input[256];
+			if (!(std::cin >> input))
+			{
+				std::cin.clear();
+			}
+
+			// Make a bitstream
+			RakNet::BitStream bs;
+			// Write a RakNet message to the bitstream about an enum value from RakNet somewhere
+			bs.Write((RakNet::MessageID)ID_STAT);
+			// Convert character buffer to RakString?
+			RakNet::RakString name(input);
+			// Also write our users name to the bitstream
+			bs.Write(input);
+
+			//returns 0 when something is wrong
+			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false)); // Send our bitstream to the server, crash if it doesn't work
 		}
 		// Sleep this thread to keep everything responsive
 		std::this_thread::sleep_for(std::chrono::microseconds(1));
@@ -594,6 +696,9 @@ void PacketHandler()
 				case ID_ACTION:
 					HandleAction(packet);
 					break;
+				case ID_STAT:
+					ReturnStats(packet);
+					break;
 				case ID_SERVERNOTIFICATION:
 					HandleServerNotification(packet);
 					break;
@@ -615,6 +720,8 @@ int main()
 	// start threads for input, and packet reading
 	std::thread inputHandler(InputHandler);
 	std::thread packetHandler(PacketHandler);
+
+	srand(time(NULL));
 
 	// until we turn off the game...
 	while (isRunning)
