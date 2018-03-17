@@ -279,7 +279,7 @@ void OnLobbyReady(RakNet::Packet* packet)
 
 	player.SendName(packet->systemAddress, true);
 
-	if (activePlayer == -1 && m_players.size() > 1)
+	if (activePlayer == -1 && m_players.size() > 2)
 	{
 		activePlayer = m_players.begin()->first;
 		player.Notify(packet->systemAddress, true, Message, "Game is on!");
