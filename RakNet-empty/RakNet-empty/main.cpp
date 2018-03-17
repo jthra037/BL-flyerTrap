@@ -186,7 +186,6 @@ std::string GetTargetList()
 		response.append(index).append(") ").append(name).append("\n");
 		i++;
 	}
-	response.append(">> ");
 	
 	return response;
 }
@@ -285,25 +284,11 @@ void OnLobbyReady(RakNet::Packet* packet)
 		activePlayer = m_players.begin()->first;
 		player.Notify(packet->systemAddress, true, Message, "Game is on!");
 		
-		for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
-		{
-			SPlayer& player = it->second;
-
-			//skip over the player who just joined
-			if (activePlayer == it->first)
-			{
-				std::string msg = "You are the active player.\n";
-				msg.append("Please select a target (if you select yourself you heal)\n");
-				msg.append(GetTargetList());
-				player.Notify(packet->systemAddress, false, Activation, msg);
-			}
-			else
-			{
-				std::string msg = m_players.at(activePlayer).m_name;
-				msg.append(" is the active player.");
-				player.Notify(packet->systemAddress, false, Message, msg);
-			}
-		}
+		std::string msg = "You are the active player.\n";
+		msg.append("Please select a target (if you select yourself you heal)\n");
+		msg.append(GetTargetList());
+		m_players.at(activePlayer).Notify(packet->systemAddress, false, Activation, msg);
+		
 	}
 	else if (activePlayer != -1)
 	{
@@ -360,12 +345,19 @@ void HandleAction(RakNet::Packet *packet)
 	// Read stuff out of the packet in the same order it was written in
 	RakNet::MessageID messageId;
 	bs.Read(messageId);
+	
+	unsigned long guid = RakNet::RakNetGUID::ToUint32(packet->guid);
+	
+	if (guid != activePlayer)
+	{
+		ReturnStats(packet);
+		return; // go no further
+	}
 
-	int selection;
+	RakNet::RakString selection;
 	bs.Read(selection);
 
-	unsigned long guid = RakNet::RakNetGUID::ToUint32(packet->guid);
-	unsigned long selectedGUID = PlayerByIndex(selection);
+	unsigned long selectedGUID = PlayerByIndex(std::atoi(&selection.C_String()[0]));
 
 	if (selectedGUID == -1)
 	{
@@ -524,31 +516,18 @@ void InputHandler()
 		else if (g_networkState == NS_Pending)
 		{
 			// Tell the user we're pending, but only once.
-			std::cout << ">> ";
-			char input[256];
-			if (!(std::cin >> input))
-			{
-				std::cin.clear();
-			}
+			static bool doOnce = false;
+			if (!doOnce)
+				std::cout << "Wait for your turn.\nEnter ? any time to get stats.\n>> ";
 
-			// Make a bitstream
-			RakNet::BitStream bs;
-			// Write a RakNet message to the bitstream about an enum value from RakNet somewhere
-			bs.Write((RakNet::MessageID)ID_STAT);
-			// Convert character buffer to RakString?
-			RakNet::RakString name(input);
-			// Also write our users name to the bitstream
-			bs.Write(input);
-
-			//returns 0 when something is wrong
-			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false)); // Send our bitstream to the server, crash if it doesn't work
+			doOnce = true;
 		}
 		else if (g_networkState == NS_ActiveTurn)
 		{
-			int idx;
+			std::cout << ">> ";
+			char idx[256];
 			if (!(std::cin >> idx))
 			{
-				idx = 1;
 				std::cin.clear();
 			}
 
@@ -557,38 +536,24 @@ void InputHandler()
 			// Write a RakNet message to the bitstream about an enum value from RakNet somewhere
 			bs.Write((RakNet::MessageID)ID_ACTION);
 			// Convert character buffer to RakString?
-			bs.Write(idx);
+			RakNet::RakString thing(idx);
+			bs.Write(thing);
 
 			//returns 0 when something is wrong
 			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false)); // Send our bitstream to the server, crash if it doesn't work
 
 			// Change states safely
-			g_networkState_mutex.lock();
-			g_networkState = NS_Pending;
-			g_networkState_mutex.unlock();
+			//g_networkState_mutex.lock();
+			//g_networkState = NS_Pending;
+			//g_networkState_mutex.unlock();
 		}
 		else if (g_networkState == NS_Dead)
 		{
 			// We gonna figure out if the player is dead
 			// Tell the user we're pending, but only once.
-			std::cout << "You're dead, but you can still ask for stats\n>> ";
-			char input[256];
-			if (!(std::cin >> input))
-			{
-				std::cin.clear();
-			}
-
-			// Make a bitstream
-			RakNet::BitStream bs;
-			// Write a RakNet message to the bitstream about an enum value from RakNet somewhere
-			bs.Write((RakNet::MessageID)ID_STAT);
-			// Convert character buffer to RakString?
-			RakNet::RakString name(input);
-			// Also write our users name to the bitstream
-			bs.Write(input);
-
-			//returns 0 when something is wrong
-			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false)); // Send our bitstream to the server, crash if it doesn't work
+			std::cout << "You're dead, goodbye." << std::endl;
+			isRunning = false;
+			return;
 		}
 		// Sleep this thread to keep everything responsive
 		std::this_thread::sleep_for(std::chrono::microseconds(1));
