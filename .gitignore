@@ -36,4 +36,6 @@ Release/
 .Trashes
 
 # Unity Stuff
-*Unity*/Library
+*Unity*/[Ll]ibrary
+*Unity*/[Bb]uilds
+*Unity*/[Tt]emp
