@@ -2,10 +2,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Networking;
 
 [RequireComponent(typeof(Rigidbody))]
-public class PlayerController : MonoBehaviour
+public class PlayerController : NetworkBehaviour
 {
+    [SerializeField] private GameObject bulletPrefab;
+    [SerializeField] private Transform bulletSpawn;
 
     private Rigidbody rb;
     private AudioSource myAs;
@@ -38,10 +41,18 @@ public class PlayerController : MonoBehaviour
         jumpSpeed = FIN.FindViForPeak(2.6f);
     }
 
-
+    public override void OnStartLocalPlayer()
+    {
+        GetComponent<MeshRenderer>().material.color = Color.blue;
+    }
+    
     // Mostly just move states around in here
     private void Update()
     {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
         // If player is spinning but not trying to turn
         if (Input.GetAxis("Horizontal") == 0 &&
             rb.angularVelocity.sqrMagnitude > Mathf.Epsilon)
@@ -61,6 +72,11 @@ public class PlayerController : MonoBehaviour
 
         // keep track of when the player is falling
         falling = rb.velocity.y < 0 && Mathf.Abs(rb.velocity.y) > Mathf.Epsilon;
+
+        if(Input.GetMouseButtonDown(0))
+        {
+            CmdFire();
+        }
     }
 
     // Update is called once per frame
@@ -129,4 +145,24 @@ public class PlayerController : MonoBehaviour
     {
         return Mathf.Sqrt(-2 * Physics.gravity.y * height);
     }
+
+    [Command]
+    private void CmdFire()
+    {
+        // Create the Bullet from the Bullet Prefab
+        var bullet = (GameObject)Instantiate(
+            bulletPrefab,
+            bulletSpawn.position,
+            bulletSpawn.rotation);
+
+        // Add velocity to the bullet
+        bullet.GetComponent<Rigidbody>().velocity = bullet.transform.forward * 6;
+
+        NetworkServer.Spawn(bullet);
+
+        // Destroy the bullet after 2 seconds
+        Destroy(bullet, 2.0f);
+    }
+
+
 }
