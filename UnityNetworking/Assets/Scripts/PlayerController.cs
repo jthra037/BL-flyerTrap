@@ -86,17 +86,20 @@ public class PlayerController : NetworkBehaviour
         float airDamp = grounded ? 1 : airbourneModifier;
         float sprintMod = Input.GetKey(KeyCode.LeftShift) ? 2 : 1;
 
-        // apply the forces by multiplying relevant modifier and input axis
-        rb.AddForce(transform.forward * moveSpeed * airDamp * Input.GetAxisRaw("Vertical") * sprintMod);
-        //rb.AddForce(transform.right * moveSpeed * airDamp * Input.GetAxisRaw("Strafe") * sprintMod);
-        rb.AddTorque(transform.up * rotSpeed * airDamp * Input.GetAxis("Horizontal"));
+        // update the velocity based on inputs relative to transform
+        Vector3 vel = rb.velocity;
+        Vector3 forwVel = transform.forward * moveSpeed * airDamp * Input.GetAxisRaw("Vertical") * sprintMod;
+        Vector3 rightVel = transform.right * moveSpeed * airDamp * Input.GetAxisRaw("Horizontal") * sprintMod;
+        vel.z = forwVel.z + rightVel.z;
+        vel.x = forwVel.x + rightVel.x;
+        rb.velocity = vel;
 
-        Vector2 controllableMovement = new Vector2(rb.velocity.x, rb.velocity.z);
-        if (controllableMovement.sqrMagnitude > (maxSpeed * maxSpeed * sprintMod))
-        {
-            controllableMovement = controllableMovement.normalized * maxSpeed * sprintMod;
-            rb.velocity = new Vector3(controllableMovement.x, rb.velocity.y, controllableMovement.y);
-        }
+        //Vector2 controllableMovement = new Vector2(rb.velocity.x, rb.velocity.z);
+        //if (controllableMovement.sqrMagnitude > (maxSpeed * maxSpeed * sprintMod))
+        //{
+        //    controllableMovement = controllableMovement.normalized * maxSpeed * sprintMod;
+        //    rb.velocity = new Vector3(controllableMovement.x, rb.velocity.y, controllableMovement.y);
+        //}
 
         // only allow player to jump if they are 
         //1) on the ground 
@@ -119,6 +122,14 @@ public class PlayerController : NetworkBehaviour
         if (!grounded && falling)
         {
             rb.AddForce(2 * Physics.gravity);
+        }
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Flag"))
+        {
+            pickupObject(other.transform);
         }
     }
 
@@ -150,7 +161,7 @@ public class PlayerController : NetworkBehaviour
     private void CmdFire()
     {
         // Create the Bullet from the Bullet Prefab
-        var bullet = (GameObject)Instantiate(
+        GameObject bullet = Instantiate(
             bulletPrefab,
             bulletSpawn.position,
             bulletSpawn.rotation);
@@ -164,5 +175,14 @@ public class PlayerController : NetworkBehaviour
         Destroy(bullet, 2.0f);
     }
 
+    private void pickupObject(Transform o)
+    {
+        o.parent = bulletSpawn;
 
+        o.localPosition = Vector3.zero;
+
+        Quaternion desiredRotation = new Quaternion();
+        desiredRotation.eulerAngles = new Vector3(0, 180, 60);
+        o.localRotation = desiredRotation;
+    }
 }
