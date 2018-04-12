@@ -82,6 +82,10 @@ public class PlayerController : NetworkBehaviour
     // Update is called once per frame
     private void FixedUpdate()
     {
+        if(!isLocalPlayer)
+        {
+            return;
+        }
         // figure out if we should be hampering the players controls because they are in the air
         float airDamp = grounded ? 1 : airbourneModifier;
         float sprintMod = Input.GetKey(KeyCode.LeftShift) ? 2 : 1;
