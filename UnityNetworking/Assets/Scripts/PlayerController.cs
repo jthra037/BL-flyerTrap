@@ -35,8 +35,6 @@ public class PlayerController : NetworkBehaviour
         rb = GetComponent<Rigidbody>();
         myAs = GetComponent<AudioSource>();
 
-        rb.maxAngularVelocity = (1.5f * Mathf.PI); // Make sure we don't spin too fast
-
         //jumpSpeed = FindReqJumpSpeed(2.6f); // Figure out what Viy should be to jump 2.6 units all the time
         jumpSpeed = FIN.FindViForPeak(2.6f);
     }
