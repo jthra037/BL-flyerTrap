@@ -9,7 +9,7 @@ public class PlayerController : NetworkBehaviour
 {
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform bulletSpawn;
-
+	[SerializeField] private Text hudUpdates;
     private Rigidbody rb;
     private AudioSource myAs;
 
@@ -37,12 +37,23 @@ public class PlayerController : NetworkBehaviour
 
         //jumpSpeed = FindReqJumpSpeed(2.6f); // Figure out what Viy should be to jump 2.6 units all the time
         jumpSpeed = FIN.FindViForPeak(2.6f);
+
+		hudUpdates.text = (isLocalPlayer ? "Local :" : "NOT Local :") + netId;
+
+        Camera myCam = GetComponentInChildren<Camera>();
+        foreach (Camera cam in FindObjectsOfType<Camera>())
+        {
+            if (!cam.Equals(myCam))
+            {
+                cam.enabled = false;
+            }
+        }
     }
 
-    public override void OnStartLocalPlayer()
+	/*public override void OnStartLocalPlayer()
     {
         GetComponent<MeshRenderer>().material.color = Color.blue;
-    }
+    }*/
     
     // Mostly just move states around in here
     private void Update()
