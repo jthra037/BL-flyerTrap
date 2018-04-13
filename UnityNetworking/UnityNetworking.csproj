@@ -309,10 +309,13 @@
     <Compile Include="Assets\Scripts\Billboard.cs" />
     <Compile Include="Assets\Scripts\Bullet.cs" />
     <Compile Include="Assets\Scripts\FIN.cs" />
+    <Compile Include="Assets\Scripts\GameManager.cs" />
     <Compile Include="Assets\Scripts\Health.cs" />
     <Compile Include="Assets\Scripts\PlayerController.cs" />
     <Compile Include="Assets\Scripts\PlayerSpawner.cs" />
+    <Compile Include="Assets\Scripts\ScoreBoard.cs" />
     <Compile Include="Assets\Scripts\SmoothMouseLook.cs" />
+    <Compile Include="Assets\Scripts\SwitchBoard.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Standard Assets\Effects\ToonShading\Shaders\ToonBasic.shader" />
