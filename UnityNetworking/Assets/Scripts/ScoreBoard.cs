@@ -2,15 +2,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ScoreBoard : MonoBehaviour {
+public class Score
+{
+    public int ID;
+    public int Value;
 
-	// Use this for initialization
-	void Start () {
-		
-	}
-	
-	// Update is called once per frame
-	void Update () {
-		
-	}
+    Score(int id)
+    {
+        ID = id;
+    }
+}
+
+
+static class ScoreBoard {
+    static public List<Score> Scores = new List<Score>();
 }
