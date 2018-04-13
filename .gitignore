@@ -34,3 +34,8 @@ Debug/
 Release/
 .DS_Store
 .Trashes
+
+# Unity Stuff
+*Unity*/[Ll]ibrary
+*Unity*/[Bb]uilds
+*Unity*/[Tt]emp
