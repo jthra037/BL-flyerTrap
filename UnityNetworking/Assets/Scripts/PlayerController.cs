@@ -9,6 +9,8 @@ public class PlayerController : NetworkBehaviour
 {
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform bulletSpawn;
+    [SerializeField] private GameObject body;
+    [SerializeField] private Camera eyes;
 
     private Rigidbody rb;
     private AudioSource myAs;
@@ -43,7 +45,8 @@ public class PlayerController : NetworkBehaviour
 
     public override void OnStartLocalPlayer()
     {
-        GetComponent<MeshRenderer>().material.color = Color.blue;
+        body.GetComponent<MeshRenderer>().material.color = Color.blue;
+        eyes.gameObject.SetActive(true);
     }
     
     // Mostly just move states around in here
@@ -82,6 +85,11 @@ public class PlayerController : NetworkBehaviour
     // Update is called once per frame
     private void FixedUpdate()
     {
+        if(!isLocalPlayer)
+        {
+            return;
+        }
+
         // figure out if we should be hampering the players controls because they are in the air
         float airDamp = grounded ? 1 : airbourneModifier;
         float sprintMod = Input.GetKey(KeyCode.LeftShift) ? 2 : 1;

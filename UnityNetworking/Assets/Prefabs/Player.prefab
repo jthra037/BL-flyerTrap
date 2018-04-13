@@ -28,7 +28,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &1288410338955728
 GameObject:
   m_ObjectHideFlags: 0
@@ -43,6 +43,7 @@ GameObject:
   - component: {fileID: 114316340321645304}
   - component: {fileID: 114387828862358746}
   - component: {fileID: 65759867153718726}
+  - component: {fileID: 114332903859027498}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -209,7 +210,7 @@ Camera:
   m_GameObject: {fileID: 1011424240349862}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
+  m_ClearFlags: 2
   m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
@@ -420,10 +421,33 @@ MonoBehaviour:
   bulletPrefab: {fileID: 1985108130808954, guid: 12a76a2b8bc782b4aaa99d375be0e5f1,
     type: 2}
   bulletSpawn: {fileID: 4507706159821320}
+  body: {fileID: 1480011845243760}
+  eyes: {fileID: 20322752406834170}
   moveSpeed: 10
   maxSpeed: 5
   rotSpeed: 10
   airbourneModifier: 0.2
+--- !u!114 &114332903859027498
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1288410338955728}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1768714887, guid: dc443db3e92b4983b9738c1131f555cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_TransformSyncMode: 3
+  m_SendInterval: 0.1
+  m_SyncRotationAxis: 4
+  m_RotationSyncCompression: 0
+  m_SyncSpin: 0
+  m_MovementTheshold: 0.001
+  m_VelocityThreshold: 0.0001
+  m_SnapThreshold: 5
+  m_InterpolateRotation: 1
+  m_InterpolateMovement: 1
 --- !u!114 &114387828862358746
 MonoBehaviour:
   m_ObjectHideFlags: 1
