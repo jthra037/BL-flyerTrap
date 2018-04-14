@@ -11,6 +11,7 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private Transform bulletSpawn;
     [SerializeField] private GameObject body;
     [SerializeField] private Camera eyes;
+    public RectTransform scoreHeading;
 
     private Rigidbody rb;
     private AudioSource myAs;
@@ -48,7 +49,7 @@ public class PlayerController : NetworkBehaviour
         body.GetComponent<MeshRenderer>().material.color = Color.blue;
         eyes.gameObject.SetActive(true);
     }
-    
+
     // Mostly just move states around in here
     private void Update()
     {
@@ -76,7 +77,7 @@ public class PlayerController : NetworkBehaviour
         // keep track of when the player is falling
         falling = rb.velocity.y < 0 && Mathf.Abs(rb.velocity.y) > Mathf.Epsilon;
 
-        if(Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0))
         {
             CmdFire();
         }
@@ -85,7 +86,7 @@ public class PlayerController : NetworkBehaviour
     // Update is called once per frame
     private void FixedUpdate()
     {
-        if(!isLocalPlayer)
+        if (!isLocalPlayer)
         {
             return;
         }
@@ -102,17 +103,6 @@ public class PlayerController : NetworkBehaviour
         vel.x = forwVel.x + rightVel.x;
         rb.velocity = vel;
 
-        //Vector2 controllableMovement = new Vector2(rb.velocity.x, rb.velocity.z);
-        //if (controllableMovement.sqrMagnitude > (maxSpeed * maxSpeed * sprintMod))
-        //{
-        //    controllableMovement = controllableMovement.normalized * maxSpeed * sprintMod;
-        //    rb.velocity = new Vector3(controllableMovement.x, rb.velocity.y, controllableMovement.y);
-        //}
-
-        // only allow player to jump if they are 
-        //1) on the ground 
-        //2) pressing the jump button 
-        //3) if they are not still holding the jump button from a previous jump
         if (grounded &&
             Input.GetAxis("Jump") != 0 &&
             !jumping)
@@ -192,5 +182,15 @@ public class PlayerController : NetworkBehaviour
         Quaternion desiredRotation = new Quaternion();
         desiredRotation.eulerAngles = new Vector3(0, 180, 60);
         o.localRotation = desiredRotation;
+    }
+
+    private void register()
+    {
+        SwitchBoard.gm.Register(this);
+    }
+
+    private void deregister()
+    {
+        SwitchBoard.gm.Deregister(this);
     }
 }
