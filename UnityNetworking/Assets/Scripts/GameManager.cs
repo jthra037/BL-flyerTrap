@@ -64,13 +64,19 @@ public class GameManager : NetworkBehaviour {
     [HideInInspector]
     public SyncScoreList playerScores = new SyncScoreList();
 
+    [SyncVar]
     public int playerWithFlag;
 
-    //private Dictionary<int, PlayerController> players = new Dictionary<int, PlayerController>();
-
+    // Delegate setups
+    public delegate void ScoreChange();
+    public static event ScoreChange ScoreAction;
+    
     private void Awake()
     {
+        Debug.Log("Gamemanager is awake");
         SwitchBoard.gm = this;
+
+        Debug.Log(SwitchBoard.gm == this ? "Switchboard.gm assigned correctly" : "Switchboard.gm ASSIGNED WRONG");
     }
 
     private void OnDisable()
@@ -80,9 +86,9 @@ public class GameManager : NetworkBehaviour {
 
     public void Register(PlayerController pc)
     {
-        if (pc.isLocalPlayer && !scoresContainID(pc.playerControllerId))
+        if (pc.isLocalPlayer && !scoresContainID((int)pc.netId.Value))
         {
-            Score registrantScore = new Score(pc.playerControllerId);
+            Score registrantScore = new Score((int)pc.netId.Value);
             CmdRegister(registrantScore);
         }
     }
@@ -90,7 +96,7 @@ public class GameManager : NetworkBehaviour {
     public void Deregister(PlayerController pc)
     {
         Score registrantScore = new Score();
-        if (pc.isLocalPlayer && scoresContainID(pc.playerControllerId, out registrantScore))
+        if (pc.isLocalPlayer && scoresContainID((int)pc.netId.Value, out registrantScore))
         {
             CmdRegister(registrantScore);
         }
@@ -171,20 +177,34 @@ public class GameManager : NetworkBehaviour {
 
     public void FlagHolderUpdate(PlayerController pc)
     {
-        playerWithFlag = pc.playerControllerId;
+        playerWithFlag = (int)pc.netId.Value;
     }
 
     public void PlayerScored()
     {
         Score newScore = new Score(playerWithFlag, 1);
-        if (scoresContainID(playerWithFlag, out newScore))
+        if (scoresContainID(playerWithFlag))
         {
-            newScore = new Score(newScore.id, (newScore.score + 1));    
+            int idx = findScoreByID(playerWithFlag);
+            newScore = new Score(playerScores[idx].id, playerScores[idx].score + 1);
+            playerScores[idx] = newScore;
         }
         else
         {
             Debug.LogWarning("Player " + playerWithFlag + " just scored and couldn't be found in score list");
             CmdRegister(newScore);
+        }
+
+        Debug.Log("Player " + playerWithFlag + " has scored!");
+        Debug.Log("Current standings are now: ");
+        foreach (Score s in playerScores)
+        {
+            Debug.Log(s.ToString());
+        }
+
+        if (ScoreAction != null)
+        {
+            ScoreAction();
         }
     }
 }

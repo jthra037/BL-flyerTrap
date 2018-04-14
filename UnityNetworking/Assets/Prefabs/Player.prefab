@@ -620,6 +620,7 @@ MonoBehaviour:
   bulletSpawn: {fileID: 4507706159821320}
   body: {fileID: 1480011845243760}
   eyes: {fileID: 20322752406834170}
+  scoreHeading: {fileID: 224711271137075754}
   moveSpeed: 10
   maxSpeed: 5
   rotSpeed: 10

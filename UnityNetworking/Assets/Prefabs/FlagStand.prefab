@@ -24,6 +24,7 @@ GameObject:
   - component: {fileID: 23214189737601898}
   - component: {fileID: 114878716868461522}
   - component: {fileID: 114524727927158082}
+  - component: {fileID: 114495950913212162}
   m_Layer: 0
   m_Name: FlagStand
   m_TagString: Untagged
@@ -151,6 +152,17 @@ Light:
   m_UseColorTemperature: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0
+--- !u!114 &114495950913212162
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1545456727669970}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a15c2c54abae0ef4eba256164b0d772c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!114 &114524727927158082
 MonoBehaviour:
   m_ObjectHideFlags: 1

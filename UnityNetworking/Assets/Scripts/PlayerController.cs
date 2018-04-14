@@ -12,6 +12,9 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private GameObject body;
     [SerializeField] private Camera eyes;
     public RectTransform scoreHeading;
+    private List<Text> scoreListings = new List<Text>();
+
+    private GameManager gm;
 
     private Rigidbody rb;
     private AudioSource myAs;
@@ -42,6 +45,13 @@ public class PlayerController : NetworkBehaviour
 
         //jumpSpeed = FindReqJumpSpeed(2.6f); // Figure out what Viy should be to jump 2.6 units all the time
         jumpSpeed = FIN.FindViForPeak(2.6f);
+
+        gm = GameObject.FindGameObjectWithTag("GameController").GetComponent<GameManager>();
+        Debug.Log(SwitchBoard.gm);
+        Debug.Log(SwitchBoard.gm == gm ? "Nothing seems wrong, switchboard has gm" : "Switchboard.gm != gm");
+
+        // register to delegate
+        GameManager.ScoreAction += HUDScoreUpdate;
     }
 
     public override void OnStartLocalPlayer()
@@ -128,7 +138,7 @@ public class PlayerController : NetworkBehaviour
         if (other.CompareTag("Flag"))
         {
             pickupObject(other.transform);
-            SwitchBoard.gm.FlagHolderUpdate(this);
+            gm.FlagHolderUpdate(this);
         }
     }
 
@@ -187,11 +197,16 @@ public class PlayerController : NetworkBehaviour
 
     private void register()
     {
-        SwitchBoard.gm.Register(this);
+        gm.Register(this);
     }
 
     private void deregister()
     {
-        SwitchBoard.gm.Deregister(this);
+        gm.Deregister(this);
+    }
+
+    private void HUDScoreUpdate()
+    {
+        Debug.Log("HUDScoreUpdate called on " + GetInstanceID());
     }
 }
