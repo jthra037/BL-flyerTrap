@@ -61,10 +61,10 @@ public class GameManager : NetworkBehaviour {
     public class SyncScoreList : SyncListStruct<Score>
     { }
 
-
-
     [HideInInspector]
     public SyncScoreList playerScores = new SyncScoreList();
+
+    public int playerWithFlag;
 
     //private Dictionary<int, PlayerController> players = new Dictionary<int, PlayerController>();
 
@@ -90,7 +90,7 @@ public class GameManager : NetworkBehaviour {
     public void Deregister(PlayerController pc)
     {
         Score registrantScore = new Score();
-        if (pc.isLocalPlayer && scoresContainID(pc.playerControllerId, registrantScore))
+        if (pc.isLocalPlayer && scoresContainID(pc.playerControllerId, out registrantScore))
         {
             CmdRegister(registrantScore);
         }
@@ -119,14 +119,6 @@ public class GameManager : NetworkBehaviour {
         }
     }
 
-    //public PlayerController GetPC(int id)
-    //{
-    //    PlayerController pc = null;
-    //    players.TryGetValue(id, out pc);
-    //
-    //    return pc;
-    //}
-
     private bool scoresContainID(int id)
     {
         bool found = false;
@@ -142,7 +134,7 @@ public class GameManager : NetworkBehaviour {
         return found;
     }
 
-    private bool scoresContainID(int id, Score result)
+    private bool scoresContainID(int id, out Score result)
     {
         bool found = false;
         foreach (Score s in playerScores)
@@ -155,6 +147,7 @@ public class GameManager : NetworkBehaviour {
             }
         }
 
+        result = new Score(id);
         return found;
     }
 
@@ -174,5 +167,24 @@ public class GameManager : NetworkBehaviour {
         }
 
         return -1;
+    }
+
+    public void FlagHolderUpdate(PlayerController pc)
+    {
+        playerWithFlag = pc.playerControllerId;
+    }
+
+    public void PlayerScored()
+    {
+        Score newScore = new Score(playerWithFlag, 1);
+        if (scoresContainID(playerWithFlag, out newScore))
+        {
+            newScore = new Score(newScore.id, (newScore.score + 1));    
+        }
+        else
+        {
+            Debug.LogWarning("Player " + playerWithFlag + " just scored and couldn't be found in score list");
+            CmdRegister(newScore);
+        }
     }
 }

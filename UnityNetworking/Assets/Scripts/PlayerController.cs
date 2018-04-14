@@ -128,6 +128,7 @@ public class PlayerController : NetworkBehaviour
         if (other.CompareTag("Flag"))
         {
             pickupObject(other.transform);
+            SwitchBoard.gm.FlagHolderUpdate(this);
         }
     }
 
