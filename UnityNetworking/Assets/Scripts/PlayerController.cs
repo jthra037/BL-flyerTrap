@@ -208,5 +208,21 @@ public class PlayerController : NetworkBehaviour
     private void HUDScoreUpdate()
     {
         Debug.Log("HUDScoreUpdate called on " + GetInstanceID());
+        // clear previous scores
+        for(int i = 0; i < scoreListings.Count;)
+        {
+            Destroy(scoreListings[0].gameObject);
+            scoreListings.Remove(scoreListings[0]);
+        }
+
+        // write all new scores
+        foreach (GameManager.Score s in gm.playerScores)
+        {
+            GameObject o = Instantiate(scoreHeading.gameObject, scoreHeading.parent);
+            Text t = o.GetComponent<Text>();
+            scoreListings.Add(t);
+            t.text = s.ToString();
+        }
+
     }
 }
