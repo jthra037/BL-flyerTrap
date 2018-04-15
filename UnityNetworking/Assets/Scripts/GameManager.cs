@@ -70,7 +70,19 @@ public class GameManager : NetworkBehaviour {
     // Delegate setups
     public delegate void ScoreChange();
     public static event ScoreChange ScoreAction;
-    
+
+    private int roomCount = 1;
+    private List<RoomController> roomList = new List<RoomController>();
+
+    [SerializeField]
+    [Range(5, 10)]
+    private int flagRoomMin = 8;
+    [SerializeField]
+    [Range(11, 16)]
+    private int flagRoomMax = 13;
+
+    private int flagRoom;
+
     private void Awake()
     {
         Debug.Log("Gamemanager is awake");
@@ -79,9 +91,35 @@ public class GameManager : NetworkBehaviour {
         Debug.Log(SwitchBoard.gm == this ? "Switchboard.gm assigned correctly" : "Switchboard.gm ASSIGNED WRONG");
     }
 
+    private void Start()
+    {
+        flagRoom = Random.Range(flagRoomMin, flagRoomMax);
+    }
+
     private void OnDisable()
     {
         SwitchBoard.gm = null;
+    }
+
+    public void Register(RoomController rc)
+    {
+        if(isServer)
+        { 
+            roomCount++;
+            Debug.Log("Registering room: " + roomCount);
+            rc.gameObject.name = "Room" + roomCount;
+
+            roomList.Add(rc);
+
+            if (roomCount == flagRoom)
+            {
+                Debug.Log("Spawning flag stuff!");
+                rc.SpawnFlag();
+                int ridx = Random.Range(0, roomList.Count);
+                Debug.Log("room index: " + ridx);
+                roomList[ridx].SpawnFlagstand();
+            }
+        }
     }
 
     public void Register(PlayerController pc)
@@ -106,7 +144,6 @@ public class GameManager : NetworkBehaviour {
     private void CmdRegister(Score pc)
     {
         int id = pc.id;
-
 
         if (!scoresContainID(id))
         {
