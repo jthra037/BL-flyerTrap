@@ -66,6 +66,7 @@ public class GameManager : NetworkBehaviour {
 
     [SyncVar]
     public int playerWithFlag;
+    private Dictionary<int, PlayerController> players = new Dictionary<int, PlayerController>();
 
     // Delegate setups
     public delegate void ScoreChange();
@@ -73,6 +74,11 @@ public class GameManager : NetworkBehaviour {
 
     private int roomCount = 1;
     private List<RoomController> roomList = new List<RoomController>();
+
+    [HideInInspector]
+    public GameObject flagRef;
+    [HideInInspector]
+    public GameObject flagStandRef;
 
     [SerializeField]
     [Range(5, 10)]
@@ -101,33 +107,44 @@ public class GameManager : NetworkBehaviour {
         SwitchBoard.gm = null;
     }
 
+    [Server]
     public void Register(RoomController rc)
     {
-        if(isServer)
-        { 
-            roomCount++;
-            Debug.Log("Registering room: " + roomCount);
-            rc.gameObject.name = "Room" + roomCount;
+        roomCount++;
+        Debug.Log("Registering room: " + roomCount);
+        rc.gameObject.name = "Room" + roomCount;
 
-            roomList.Add(rc);
+        roomList.Add(rc);
 
-            if (roomCount == flagRoom)
-            {
-                Debug.Log("Spawning flag stuff!");
-                rc.SpawnFlag();
-                int ridx = Random.Range(0, roomList.Count);
-                Debug.Log("room index: " + ridx);
-                roomList[ridx].SpawnFlagstand();
-            }
+        if (roomCount == flagRoom)
+        {
+            Debug.Log("Spawning flag stuff!");
+            rc.SpawnFlag();
+            int ridx = Random.Range(0, roomList.Count);
+            Debug.Log("room index: " + ridx);
+            roomList[ridx].SpawnFlagstand();
+
+            RpcFindFlags();
         }
+    }
+
+    [ClientRpc]
+    private void RpcFindFlags()
+    {
+        flagRef = GameObject.FindGameObjectWithTag("Flag");
+        flagStandRef = GameObject.FindGameObjectWithTag("FlagStand");
     }
 
     public void Register(PlayerController pc)
     {
-        if (pc.isLocalPlayer && !scoresContainID((int)pc.netId.Value))
+        if (!scoresContainID((int)pc.netId.Value))
         {
-            Score registrantScore = new Score((int)pc.netId.Value);
-            CmdRegister(registrantScore);
+            players.Add((int)pc.netId.Value, pc);
+            if(pc.isLocalPlayer)
+            { 
+                Score registrantScore = new Score((int)pc.netId.Value);
+                CmdRegister(registrantScore);
+            }
         }
     }
 
@@ -136,7 +153,8 @@ public class GameManager : NetworkBehaviour {
         Score registrantScore = new Score();
         if (pc.isLocalPlayer && scoresContainID((int)pc.netId.Value, out registrantScore))
         {
-            CmdRegister(registrantScore);
+            players.Remove((int)pc.netId.Value);
+            CmdDeregister(registrantScore);
         }
     }
 
@@ -212,9 +230,43 @@ public class GameManager : NetworkBehaviour {
         return -1;
     }
 
-    public void FlagHolderUpdate(PlayerController pc)
+    [Server]
+    public void FlagHolderUpdate(PlayerController pc, Transform flagTransform)
     {
+        Debug.Log("<< FlagHolderUpdate");
         playerWithFlag = (int)pc.netId.Value;
+        Debug.Log("Player with flag: " + playerWithFlag);
+        PlayerController registeredPC;
+        if(players.TryGetValue(playerWithFlag, out registeredPC))
+        {
+            Debug.Log(playerWithFlag + " was registered");
+
+            registeredPC.pickupObject(flagRef.transform);
+            registeredPC.RpcPickupFlag();
+
+            RpcTurnOffFlagParticles();
+        }
+        else
+        {
+            Debug.Log(playerWithFlag + " was not registered");
+        }
+
+        Debug.Log(">> FlagHolderUpdate");
+    }
+
+    [Server]
+    public void FlagHolderUpdate()
+    {
+
+    }
+
+    [ClientRpc]
+    private void RpcTurnOffFlagParticles()
+    {
+        //Debug.Log("gm " + transform.GetHashCode() + " turning off particles : " +
+        //    flagRef.GetComponent<ParticleSystem>().IsAlive());
+
+        flagRef.GetComponent<ParticleSystem>().Stop();
     }
 
     public void PlayerScored()

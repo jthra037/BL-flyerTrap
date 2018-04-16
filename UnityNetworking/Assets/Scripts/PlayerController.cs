@@ -49,6 +49,7 @@ public class PlayerController : NetworkBehaviour
         gm = GameObject.FindGameObjectWithTag("GameController").GetComponent<GameManager>();
         Debug.Log(SwitchBoard.gm);
         Debug.Log(SwitchBoard.gm == gm ? "Nothing seems wrong, switchboard has gm" : "Switchboard.gm != gm");
+        gm.Register(this);
 
         // register to delegate
         GameManager.ScoreAction += HUDScoreUpdate;
@@ -58,6 +59,11 @@ public class PlayerController : NetworkBehaviour
     {
         body.GetComponent<MeshRenderer>().material.color = Color.blue;
         eyes.gameObject.SetActive(true);
+
+        Vector2 xzOffset = Random.insideUnitCircle * 5.5f;
+        transform.localPosition = new Vector3(transform.localPosition.x + xzOffset.x,
+            transform.localPosition.y,
+            transform.localPosition.z + xzOffset.y);
     }
 
     // Mostly just move states around in here
@@ -137,8 +143,8 @@ public class PlayerController : NetworkBehaviour
     {
         if (other.CompareTag("Flag"))
         {
-            pickupObject(other.transform);
-            gm.FlagHolderUpdate(this);
+            Debug.Log("Player collided with flag");
+            gm.FlagHolderUpdate(this, other.transform);
         }
     }
 
@@ -184,7 +190,7 @@ public class PlayerController : NetworkBehaviour
         Destroy(bullet, 2.0f);
     }
 
-    private void pickupObject(Transform o)
+    public void pickupObject(Transform o)
     {
         o.parent = bulletSpawn;
 
@@ -194,6 +200,28 @@ public class PlayerController : NetworkBehaviour
         desiredRotation.eulerAngles = new Vector3(0, 180, 60);
         o.localRotation = desiredRotation;
     }
+
+
+    [ClientRpc]
+    public void RpcPickupFlag()
+    {
+        Debug.Log("<< RpcPickupFlag");
+        Debug.Log("gm has flag logged: " + gm.flagRef);
+        pickupObject(gm.flagRef.transform);
+        Debug.Log(">> RpcPickupFlag");
+    }
+
+    public void DropFlag()
+    {
+
+    }
+
+    [ClientRpc]
+    public void RpcDropFlag()
+    {
+
+    }
+
 
     private void register()
     {
@@ -221,8 +249,9 @@ public class PlayerController : NetworkBehaviour
             GameObject o = Instantiate(scoreHeading.gameObject, scoreHeading.parent);
             Text t = o.GetComponent<Text>();
             scoreListings.Add(t);
-            t.text = s.ToString();
+            t.text = s.id == (int)netId.Value ?
+                "You :: " + s.score:
+                t.text = s.ToString();         
         }
-
     }
 }
