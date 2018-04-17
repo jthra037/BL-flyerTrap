@@ -120,12 +120,17 @@ public class GameManager : NetworkBehaviour {
         {
             Debug.Log("Spawning flag stuff!");
             rc.SpawnFlag();
-            int ridx = Random.Range(0, roomList.Count);
-            Debug.Log("room index: " + ridx);
-            roomList[ridx].SpawnFlagstand();
-
+            GetRandomRoom().SpawnFlagstand();
             RpcFindFlags();
         }
+    }
+
+    [Server]
+    private RoomController GetRandomRoom()
+    {
+        int ridx = Random.Range(0, roomList.Count);
+        Debug.Log("room index: " + ridx);
+        return roomList[ridx];
     }
 
     [ClientRpc]
@@ -254,10 +259,10 @@ public class GameManager : NetworkBehaviour {
         Debug.Log(">> FlagHolderUpdate");
     }
 
-    [Server]
-    public void FlagHolderUpdate()
+    [Command]
+    public void CmdFlagHolderUpdate()
     {
-
+        playerWithFlag = -1;
     }
 
     [ClientRpc]
@@ -277,6 +282,11 @@ public class GameManager : NetworkBehaviour {
             int idx = findScoreByID(playerWithFlag);
             newScore = new Score(playerScores[idx].id, playerScores[idx].score + 1);
             playerScores[idx] = newScore;
+
+            Destroy(flagRef.gameObject);
+
+            GetRandomRoom().SpawnFlag();
+            RpcFindFlags();
         }
         else
         {

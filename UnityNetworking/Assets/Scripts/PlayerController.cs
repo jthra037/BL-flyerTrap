@@ -11,6 +11,7 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private Transform bulletSpawn;
     [SerializeField] private GameObject body;
     [SerializeField] private Camera eyes;
+    [SerializeField] private RectTransform flagIndicator;
     public RectTransform scoreHeading;
     private List<Text> scoreListings = new List<Text>();
 
@@ -97,6 +98,8 @@ public class PlayerController : NetworkBehaviour
         {
             CmdFire();
         }
+
+        HUDUpdate();
     }
 
     // Update is called once per frame
@@ -213,13 +216,27 @@ public class PlayerController : NetworkBehaviour
 
     public void DropFlag()
     {
+        Transform f = gm.flagRef.transform;
+        f.parent = null;
+        f.rotation = Quaternion.identity;
+        f.localPosition = new Vector3(f.localPosition.x,
+            -2.5f,
+            f.localPosition.z);
 
+        gm.CmdFlagHolderUpdate();
     }
 
     [ClientRpc]
     public void RpcDropFlag()
     {
+        Transform f = gm.flagRef.transform;
+        f.parent = null;
+        f.rotation = Quaternion.identity;
+        f.localPosition = new Vector3(f.localPosition.x,
+            -2.5f,
+            f.localPosition.z);
 
+        gm.CmdFlagHolderUpdate();
     }
 
 
@@ -231,6 +248,27 @@ public class PlayerController : NetworkBehaviour
     private void deregister()
     {
         gm.Deregister(this);
+    }
+
+    private void HUDUpdate()
+    {
+        if (gm.flagRef == null)
+        {
+            flagIndicator.gameObject.SetActive(false);
+        }
+        else
+        {
+            flagIndicator.gameObject.SetActive(true);
+
+            Vector3 towardsFlag = gm.flagRef.transform.position - transform.position;
+            towardsFlag.y = 0;
+            Vector3 facing = transform.forward;
+            facing.y = 0;
+
+            float zRot = Vector3.Angle(towardsFlag, facing);
+
+            flagIndicator.localRotation = Quaternion.Euler(0, 0, zRot);
+        }
     }
 
     private void HUDScoreUpdate()
